@@ -82,9 +82,37 @@ fn benchmark_hashmap() {
     println!("HashMap: 100k insert took {:?}", duration);
 }
 
+fn benchmark_libmdbx() {
+    let dir = tempdir().unwrap();
+    let db = libmdbx::Database::<libmdbx::NoWriteMap>::open(&dir).unwrap();
+
+    let data = generate_test_data();
+
+    let txn = db.begin_rw_txn().unwrap();
+    let table = txn.open_table(None).unwrap();
+
+    // Measure start
+    let start = Instant::now();
+    for (key, value) in data {
+        txn.put(
+            &table,
+            &key.to_be_bytes(),
+            &value.to_be_bytes(),
+            libmdbx::WriteFlags::empty(),
+        )
+        .unwrap();
+    }
+    txn.commit().unwrap();
+    let duration = start.elapsed();
+    // Measure end
+
+    println!("Libmdbx: 100k insert took {:?}", duration);
+}
+
 fn main() {
     println!("Benchmarking 100k batch writes of random u64 key-value pairs\n");
     benchmark_sled();
     benchmark_redb();
     benchmark_hashmap();
+    benchmark_libmdbx();
 }
