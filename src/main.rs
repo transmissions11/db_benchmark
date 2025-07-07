@@ -1,5 +1,4 @@
 use rand::Rng;
-use std::collections::HashMap;
 use std::time::Instant;
 use tempfile::tempdir;
 
@@ -12,6 +11,36 @@ fn generate_test_data() -> Vec<(u64, u64)> {
         data.push((rng.r#gen::<u64>(), rng.r#gen::<u64>()));
     }
     data
+}
+
+fn benchmark_hashmap() {
+    let data = generate_test_data();
+
+    // Measure start
+    let start = Instant::now();
+    let mut map = std::collections::HashMap::new();
+    for (key, value) in data {
+        map.insert(key, value);
+    }
+    let duration = start.elapsed();
+    // Measure end
+
+    println!("HashMap: {DATA_SIZE} insert took {:?}", duration);
+}
+
+fn benchmark_hashmap_noncrypto() {
+    let data = generate_test_data();
+
+    // Measure start
+    let start = Instant::now();
+    let mut map = hashbrown::HashMap::new();
+    for (key, value) in data {
+        map.insert(key, value);
+    }
+    let duration = start.elapsed();
+    // Measure end
+
+    println!("HashMap non-crypto: {DATA_SIZE} insert took {:?}", duration);
 }
 
 fn benchmark_sled() {
@@ -69,21 +98,6 @@ fn benchmark_redb() {
     println!("Redb: {DATA_SIZE} batch write took {:?}", duration);
 }
 
-fn benchmark_hashmap() {
-    let data = generate_test_data();
-
-    // Measure start
-    let start = Instant::now();
-    let mut map = HashMap::new();
-    for (key, value) in data {
-        map.insert(key, value);
-    }
-    let duration = start.elapsed();
-    // Measure end
-
-    println!("HashMap: {DATA_SIZE} insert took {:?}", duration);
-}
-
 fn benchmark_libmdbx() {
     let dir = tempdir().unwrap();
 
@@ -91,7 +105,7 @@ fn benchmark_libmdbx() {
         &dir,
         libmdbx::DatabaseOptions {
             mode: libmdbx::Mode::ReadWrite(libmdbx::ReadWriteOptions {
-                sync_mode: libmdbx::SyncMode::UtterlyNoSync,
+                sync_mode: libmdbx::SyncMode::SafeNoSync,
                 min_size: Some(1024 * 1024 * 1024),       // 1GB
                 max_size: Some(100 * 1024 * 1024 * 1024), // 100GB
                 ..Default::default()
@@ -129,5 +143,6 @@ fn main() {
     benchmark_sled();
     benchmark_redb();
     benchmark_hashmap();
+    benchmark_hashmap_noncrypto();
     benchmark_libmdbx();
 }
