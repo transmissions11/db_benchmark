@@ -3,10 +3,12 @@ use std::collections::HashMap;
 use std::time::Instant;
 use tempfile::tempdir;
 
+const DATA_SIZE: usize = 100_000;
+
 fn generate_test_data() -> Vec<(u64, u64)> {
     let mut rng = rand::thread_rng();
-    let mut data = Vec::with_capacity(10_000);
-    for _ in 0..10_000 {
+    let mut data = Vec::new();
+    for _ in 0..1_000_000 {
         data.push((rng.r#gen::<u64>(), rng.r#gen::<u64>()));
     }
     data
@@ -31,7 +33,7 @@ fn benchmark_sled() {
     let duration = start.elapsed();
     // Measure end
 
-    println!("Sled: 10k batch write took {:?}", duration);
+    println!("Sled: {DATA_SIZE} batch write took {:?}", duration);
 
     // Measure start
     let start = Instant::now();
@@ -64,7 +66,7 @@ fn benchmark_redb() {
     let duration = start.elapsed();
     // Measure end
 
-    println!("Redb: 10k batch write took {:?}", duration);
+    println!("Redb: {DATA_SIZE} batch write took {:?}", duration);
 }
 
 fn benchmark_hashmap() {
@@ -79,7 +81,7 @@ fn benchmark_hashmap() {
     let duration = start.elapsed();
     // Measure end
 
-    println!("HashMap: 10k insert took {:?}", duration);
+    println!("HashMap: {DATA_SIZE} insert took {:?}", duration);
 }
 
 fn benchmark_libmdbx() {
@@ -90,6 +92,8 @@ fn benchmark_libmdbx() {
         libmdbx::DatabaseOptions {
             mode: libmdbx::Mode::ReadWrite(libmdbx::ReadWriteOptions {
                 sync_mode: libmdbx::SyncMode::UtterlyNoSync,
+                min_size: Some(1 * 1024 * 1024 * 1024), // 1GB
+                max_size: Some(1000 * 1024 * 1024 * 1024), // 1TB
                 ..Default::default()
             }),
             ..Default::default()
@@ -117,11 +121,11 @@ fn benchmark_libmdbx() {
     let duration = start.elapsed();
     // Measure end
 
-    println!("Libmdbx: 10k insert took {:?}", duration);
+    println!("Libmdbx: {DATA_SIZE} insert took {:?}", duration);
 }
 
 fn main() {
-    println!("Benchmarking 10k batch writes of random u64 key-value pairs\n");
+    println!("Benchmarking {DATA_SIZE} batch writes of random u64 key-value pairs\n");
     benchmark_sled();
     benchmark_redb();
     benchmark_hashmap();
