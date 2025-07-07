@@ -1,4 +1,5 @@
 use rand::Rng;
+use std::collections::HashMap;
 use std::time::Instant;
 use tempfile::tempdir;
 
@@ -66,8 +67,24 @@ fn benchmark_redb() {
     println!("Redb: 100k batch write took {:?}", duration);
 }
 
+fn benchmark_hashmap() {
+    let data = generate_test_data();
+
+    // Measure start
+    let start = Instant::now();
+    let mut map = HashMap::with_capacity(100_000);
+    for (key, value) in data {
+        map.insert(key, value);
+    }
+    let duration = start.elapsed();
+    // Measure end
+
+    println!("HashMap: 100k insert took {:?}", duration);
+}
+
 fn main() {
     println!("Benchmarking 100k batch writes of random u64 key-value pairs\n");
     benchmark_sled();
     benchmark_redb();
+    benchmark_hashmap();
 }
