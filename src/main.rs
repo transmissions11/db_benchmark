@@ -1,5 +1,5 @@
 use rand::Rng;
-use std::time::Instant;
+use std::{hint::black_box, time::Instant};
 use tempfile::tempdir;
 
 const DATA_SIZE: usize = 100_000;
@@ -16,31 +16,49 @@ fn generate_test_data() -> Vec<(u64, u64)> {
 fn benchmark_hashmap() {
     let data = generate_test_data();
 
-    // Measure start
+    // Measure write
     let start = Instant::now();
     let mut map = std::collections::HashMap::new();
-    for (key, value) in data {
-        map.insert(key, value);
+    for (key, value) in &data {
+        map.insert(*key, *value);
     }
-    let duration = start.elapsed();
-    // Measure end
+    let write_duration = start.elapsed();
 
-    println!("HashMap: {DATA_SIZE} insert took {:?}", duration);
+    // Measure read
+    let start = Instant::now();
+    for (key, _) in &data {
+        let _ = map.get(key);
+    }
+    let read_duration = start.elapsed();
+
+    println!(
+        "HashMap: {DATA_SIZE} insert took {:?}, read took {:?}",
+        write_duration, read_duration
+    );
 }
 
 fn benchmark_hashmap_noncrypto() {
     let data = generate_test_data();
 
-    // Measure start
+    // Measure write
     let start = Instant::now();
     let mut map = hashbrown::HashMap::new();
-    for (key, value) in data {
-        map.insert(key, value);
+    for (key, value) in &data {
+        map.insert(*key, *value);
     }
-    let duration = start.elapsed();
-    // Measure end
+    let write_duration = start.elapsed();
 
-    println!("HashMap non-crypto: {DATA_SIZE} insert took {:?}", duration);
+    // Measure read
+    let start = Instant::now();
+    for (key, _) in &data {
+        let _ = map.get(key);
+    }
+    let read_duration = start.elapsed();
+
+    println!(
+        "HashMap non-crypto: {DATA_SIZE} insert took {:?}, read took {:?}",
+        write_duration, read_duration
+    );
 }
 
 fn benchmark_sled() {
@@ -52,25 +70,31 @@ fn benchmark_sled() {
     let db = config.open().unwrap();
     let data = generate_test_data();
 
-    // Measure start
+    // Measure write
     let start = Instant::now();
     let mut batch = sled::Batch::default();
     for (key, value) in &data {
         batch.insert(&key.to_be_bytes(), &value.to_be_bytes());
     }
     db.apply_batch(batch).unwrap();
-    let duration = start.elapsed();
-    // Measure end
+    let write_duration = start.elapsed();
 
-    println!("Sled: {DATA_SIZE} batch write took {:?}", duration);
-
-    // Measure start
+    // Flush
     let start = Instant::now();
     db.flush().unwrap();
-    let duration = start.elapsed();
-    // Measure end
+    let flush_duration = start.elapsed();
 
-    println!("Sled: flush took {:?}", duration);
+    // Measure read
+    let start = Instant::now();
+    for (key, _) in &data {
+        let _ = db.get(&key.to_be_bytes()).unwrap();
+    }
+    let read_duration = start.elapsed();
+
+    println!(
+        "Sled: {DATA_SIZE} batch write took {:?}, flush took {:?}, read took {:?}",
+        write_duration, flush_duration, read_duration
+    );
 }
 
 fn benchmark_redb() {
@@ -81,21 +105,32 @@ fn benchmark_redb() {
     let db = redb::Database::create(&db_path).unwrap();
     let data = generate_test_data();
 
-    // Measure start
+    // Measure write
     let start = Instant::now();
     let mut write_txn = db.begin_write().unwrap();
     write_txn.set_durability(redb::Durability::Eventual);
     {
         let mut table = write_txn.open_table(TABLE).unwrap();
-        for (key, value) in data {
-            table.insert(key, value).unwrap();
+        for (key, value) in &data {
+            table.insert(*key, *value).unwrap();
         }
     }
     write_txn.commit().unwrap();
-    let duration = start.elapsed();
-    // Measure end
+    let write_duration = start.elapsed();
 
-    println!("Redb: {DATA_SIZE} batch write took {:?}", duration);
+    // Measure read
+    let start = Instant::now();
+    let read_txn = db.begin_read().unwrap();
+    let table = read_txn.open_table(TABLE).unwrap();
+    for (key, _) in &data {
+        let _ = table.get(*key).unwrap();
+    }
+    let read_duration = start.elapsed();
+
+    println!(
+        "Redb: {DATA_SIZE} batch write took {:?}, read took {:?}",
+        write_duration, read_duration
+    );
 }
 
 fn benchmark_libmdbx() {
@@ -105,7 +140,7 @@ fn benchmark_libmdbx() {
         &dir,
         libmdbx::DatabaseOptions {
             mode: libmdbx::Mode::ReadWrite(libmdbx::ReadWriteOptions {
-                sync_mode: libmdbx::SyncMode::SafeNoSync,
+                sync_mode: libmdbx::SyncMode::NoMetaSync,
                 min_size: Some(1024 * 1024 * 1024),       // 1GB
                 max_size: Some(100 * 1024 * 1024 * 1024), // 100GB
                 ..Default::default()
@@ -117,11 +152,10 @@ fn benchmark_libmdbx() {
 
     let data = generate_test_data();
 
+    // Measure write
+    let start = Instant::now();
     let txn = db.begin_rw_txn().unwrap();
     let table = txn.open_table(None).unwrap();
-
-    // Measure start
-    let start = Instant::now();
     for (key, value) in data.iter() {
         txn.put(
             &table,
@@ -132,14 +166,29 @@ fn benchmark_libmdbx() {
         .unwrap();
     }
     txn.commit().unwrap();
-    let duration = start.elapsed();
-    // Measure end
+    let write_duration = start.elapsed();
 
-    println!("Libmdbx: {DATA_SIZE} insert took {:?}", duration);
+    // Measure read
+    let start = Instant::now();
+    let txn = db.begin_ro_txn().unwrap();
+    let table = txn.open_table(None).unwrap();
+    for (key, _) in data.iter() {
+        let _: Option<Vec<u8>> = black_box(txn.get(&table, &key.to_be_bytes()).unwrap());
+    }
+    let read_duration = start.elapsed();
+
+    let sync_start = Instant::now();
+    db.sync(true).unwrap();
+    let sync_duration = sync_start.elapsed();
+
+    println!(
+        "Libmdbx: {DATA_SIZE} insert took {:?}, read took {:?}, sync took {:?}",
+        write_duration, read_duration, sync_duration
+    );
 }
 
 fn main() {
-    println!("Benchmarking {DATA_SIZE} batch writes of random u64 key-value pairs\n");
+    println!("Benchmarking {DATA_SIZE} batch writes and reads of random u64 key-value pairs\n");
     benchmark_sled();
     benchmark_redb();
     benchmark_hashmap();
