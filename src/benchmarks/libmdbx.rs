@@ -5,7 +5,7 @@ use tempfile::tempdir;
 pub fn benchmark_libmdbx() {
     let dir = tempdir().unwrap();
 
-    let db = libmdbx::Database::<libmdbx::NoWriteMap>::open_with_options(
+    let db = libmdbx::Database::<libmdbx::WriteMap>::open_with_options(
         &dir,
         libmdbx::DatabaseOptions {
             mode: libmdbx::Mode::ReadWrite(libmdbx::ReadWriteOptions {
