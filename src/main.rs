@@ -5,8 +5,8 @@ use tempfile::tempdir;
 
 fn generate_test_data() -> Vec<(u64, u64)> {
     let mut rng = rand::thread_rng();
-    let mut data = Vec::with_capacity(100_000);
-    for _ in 0..100_000 {
+    let mut data = Vec::with_capacity(10_000);
+    for _ in 0..10_000 {
         data.push((rng.r#gen::<u64>(), rng.r#gen::<u64>()));
     }
     data
@@ -31,7 +31,7 @@ fn benchmark_sled() {
     let duration = start.elapsed();
     // Measure end
 
-    println!("Sled: 100k batch write took {:?}", duration);
+    println!("Sled: 10k batch write took {:?}", duration);
 
     // Measure start
     let start = Instant::now();
@@ -64,7 +64,7 @@ fn benchmark_redb() {
     let duration = start.elapsed();
     // Measure end
 
-    println!("Redb: 100k batch write took {:?}", duration);
+    println!("Redb: 10k batch write took {:?}", duration);
 }
 
 fn benchmark_hashmap() {
@@ -79,12 +79,23 @@ fn benchmark_hashmap() {
     let duration = start.elapsed();
     // Measure end
 
-    println!("HashMap: 100k insert took {:?}", duration);
+    println!("HashMap: 10k insert took {:?}", duration);
 }
 
 fn benchmark_libmdbx() {
     let dir = tempdir().unwrap();
-    let db = libmdbx::Database::<libmdbx::NoWriteMap>::open(&dir).unwrap();
+
+    let db = libmdbx::Database::<libmdbx::NoWriteMap>::open_with_options(
+        &dir,
+        libmdbx::DatabaseOptions {
+            mode: libmdbx::Mode::ReadWrite(libmdbx::ReadWriteOptions {
+                sync_mode: libmdbx::SyncMode::UtterlyNoSync,
+                ..Default::default()
+            }),
+            ..Default::default()
+        },
+    )
+    .unwrap();
 
     let data = generate_test_data();
 
@@ -93,7 +104,7 @@ fn benchmark_libmdbx() {
 
     // Measure start
     let start = Instant::now();
-    for (key, value) in data {
+    for (key, value) in data.iter() {
         txn.put(
             &table,
             &key.to_be_bytes(),
@@ -106,11 +117,11 @@ fn benchmark_libmdbx() {
     let duration = start.elapsed();
     // Measure end
 
-    println!("Libmdbx: 100k insert took {:?}", duration);
+    println!("Libmdbx: 10k insert took {:?}", duration);
 }
 
 fn main() {
-    println!("Benchmarking 100k batch writes of random u64 key-value pairs\n");
+    println!("Benchmarking 10k batch writes of random u64 key-value pairs\n");
     benchmark_sled();
     benchmark_redb();
     benchmark_hashmap();
