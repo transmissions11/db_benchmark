@@ -1,5 +1,6 @@
 use rand::Rng;
 use std::time::Instant;
+use tempfile::tempdir;
 
 fn generate_test_data() -> Vec<(u64, u64)> {
     let mut rng = rand::thread_rng();
@@ -10,13 +11,13 @@ fn generate_test_data() -> Vec<(u64, u64)> {
     data
 }
 
-fn benchmark_sled() -> std::io::Result<()> {
+fn benchmark_sled() {
     let config = sled::Config::new()
         .cache_capacity(1024 * 1024 * 1024) // 1GB
         .temporary(true)
         .flush_every_ms(None) // Disable automatic flushing.
         .mode(sled::Mode::HighThroughput);
-    let db = config.open()?;
+    let db = config.open().unwrap();
     let data = generate_test_data();
 
     // Measure start
@@ -25,7 +26,7 @@ fn benchmark_sled() -> std::io::Result<()> {
     for (key, value) in &data {
         batch.insert(&key.to_be_bytes(), &value.to_be_bytes());
     }
-    db.apply_batch(batch)?;
+    db.apply_batch(batch).unwrap();
     let duration = start.elapsed();
     // Measure end
 
@@ -33,53 +34,40 @@ fn benchmark_sled() -> std::io::Result<()> {
 
     // Measure start
     let start = Instant::now();
-    db.flush()?;
+    db.flush().unwrap();
     let duration = start.elapsed();
     // Measure end
 
     println!("Sled: flush took {:?}", duration);
-
-    std::fs::remove_dir_all("sled_bench").ok();
-    Ok(())
 }
 
-fn benchmark_redb() -> Result<(), redb::Error> {
-    use redb::{Database, TableDefinition};
+fn benchmark_redb() {
+    const TABLE: redb::TableDefinition<u64, u64> = redb::TableDefinition::new("bench");
 
-    const TABLE: TableDefinition<u64, u64> = TableDefinition::new("bench");
-
-    std::fs::remove_file("redb_bench.db").ok();
-    let db = Database::create("redb_bench.db")?;
+    let temp_dir = tempdir().expect("Failed to create tempdir");
+    let db_path = temp_dir.path().join("redb_bench.db");
+    let db = redb::Database::create(&db_path).unwrap();
     let data = generate_test_data();
 
     // Measure start
     let start = Instant::now();
-    let mut write_txn = db.begin_write()?;
+    let mut write_txn = db.begin_write().unwrap();
     write_txn.set_durability(redb::Durability::Eventual);
     {
-        let mut table = write_txn.open_table(TABLE)?;
+        let mut table = write_txn.open_table(TABLE).unwrap();
         for (key, value) in data {
-            table.insert(key, value)?;
+            table.insert(key, value).unwrap();
         }
     }
-    write_txn.commit()?;
+    write_txn.commit().unwrap();
     let duration = start.elapsed();
     // Measure end
 
     println!("Redb: 100k batch write took {:?}", duration);
-
-    std::fs::remove_file("redb_bench.db").ok();
-    Ok(())
 }
 
 fn main() {
     println!("Benchmarking 100k batch writes of random u64 key-value pairs\n");
-
-    if let Err(e) = benchmark_sled() {
-        eprintln!("Sled benchmark failed: {}", e);
-    }
-
-    if let Err(e) = benchmark_redb() {
-        eprintln!("Redb benchmark failed: {}", e);
-    }
+    benchmark_sled();
+    benchmark_redb();
 }
