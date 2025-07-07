@@ -1,7 +1,7 @@
 mod benchmarks;
 mod common;
 
-use crate::benchmarks::{hashmap, libmdbx, redb};
+use crate::benchmarks::{hashmap, libmdbx, redb, sled};
 use crate::common::DATA_SIZE;
 
 fn main() {
@@ -10,4 +10,5 @@ fn main() {
     hashmap::benchmark_hashmap();
     libmdbx::benchmark_libmdbx();
     redb::benchmark_redb();
+    sled::benchmark_sled();
 }
