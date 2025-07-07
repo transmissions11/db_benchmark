@@ -1,6 +1,6 @@
 use rand::Rng;
 
-pub const INITIAL_DATA_SIZE: usize = 1_000_000;
+pub const INITIAL_DATA_SIZE: usize = 10_000_000;
 pub const DATA_SIZE: usize = 100_000;
 
 // Generate a large initial dataset (10x the normal size)
