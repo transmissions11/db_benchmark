@@ -37,7 +37,7 @@ pub fn benchmark_hashmap() {
     let read_duration = start.elapsed();
 
     println!(
-        "HashMap: Mixed writes ({} ops, ~50% updates/50% inserts) took {:?}, read took {:?}",
+        "HashMap: Mixed writes ({} ops) took {:?}, full read took {:?}",
         DATA_SIZE, mixed_write_duration, read_duration
     );
 }
@@ -78,7 +78,7 @@ pub fn benchmark_hashmap_noncrypto() {
     let read_duration = start.elapsed();
 
     println!(
-        "HashMap non-crypto: Mixed writes ({} ops, ~50% updates/50% inserts) took {:?}, read took {:?}",
+        "HashMap non-crypto: Mixed writes ({} ops) took {:?}, full read took {:?}",
         DATA_SIZE, mixed_write_duration, read_duration
     );
 }

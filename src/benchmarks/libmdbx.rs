@@ -76,7 +76,7 @@ pub fn benchmark_libmdbx() {
     let sync_duration = sync_start.elapsed();
 
     println!(
-        "Libmdbx: Mixed writes ({} ops, ~50% updates/50% inserts) took {:?}, read took {:?}, sync took {:?}",
+        "Libmdbx: Mixed writes ({} ops) took {:?}, full read took {:?}, sync took {:?}",
         DATA_SIZE, mixed_write_duration, read_duration, sync_duration
     );
 }
