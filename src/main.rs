@@ -1,6 +1,15 @@
 use rand::Rng;
 use std::time::Instant;
 
+fn generate_test_data() -> Vec<(u64, u64)> {
+    let mut rng = rand::thread_rng();
+    let mut data = Vec::with_capacity(100_000);
+    for _ in 0..100_000 {
+        data.push((rng.r#gen::<u64>(), rng.r#gen::<u64>()));
+    }
+    data
+}
+
 fn benchmark_sled() -> std::io::Result<()> {
     let config = sled::Config::new()
         .cache_capacity(1024 * 1024 * 1024) // 1GB
@@ -8,24 +17,26 @@ fn benchmark_sled() -> std::io::Result<()> {
         .flush_every_ms(None) // Disable automatic flushing.
         .mode(sled::Mode::HighThroughput);
     let db = config.open()?;
-    let mut rng = rand::thread_rng();
+    let data = generate_test_data();
 
-    let mut batch = sled::Batch::default();
-    for _ in 0..100_000 {
-        let key = rng.r#gen::<u64>().to_be_bytes();
-        let value = rng.r#gen::<u64>().to_be_bytes();
-        batch.insert(&key[..], &value[..]);
-    }
-
+    // Measure start
     let start = Instant::now();
+    let mut batch = sled::Batch::default();
+    for (key, value) in &data {
+        batch.insert(&key.to_be_bytes(), &value.to_be_bytes());
+    }
     db.apply_batch(batch)?;
     let duration = start.elapsed();
+    // Measure end
 
     println!("Sled: 100k batch write took {:?}", duration);
 
+    // Measure start
     let start = Instant::now();
     db.flush()?;
     let duration = start.elapsed();
+    // Measure end
+
     println!("Sled: flush took {:?}", duration);
 
     std::fs::remove_dir_all("sled_bench").ok();
@@ -39,24 +50,21 @@ fn benchmark_redb() -> Result<(), redb::Error> {
 
     std::fs::remove_file("redb_bench.db").ok();
     let db = Database::create("redb_bench.db")?;
-    let mut rng = rand::thread_rng();
+    let data = generate_test_data();
 
-    let mut keys_values = Vec::with_capacity(100_000);
-    for _ in 0..100_000 {
-        keys_values.push((rng.r#gen::<u64>(), rng.r#gen::<u64>()));
-    }
-
+    // Measure start
     let start = Instant::now();
     let mut write_txn = db.begin_write()?;
     write_txn.set_durability(redb::Durability::Eventual);
     {
         let mut table = write_txn.open_table(TABLE)?;
-        for (key, value) in keys_values {
+        for (key, value) in data {
             table.insert(key, value)?;
         }
     }
     write_txn.commit()?;
     let duration = start.elapsed();
+    // Measure end
 
     println!("Redb: 100k batch write took {:?}", duration);
 
