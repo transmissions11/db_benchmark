@@ -19,11 +19,6 @@ pub fn benchmark_sled() {
     db.apply_batch(batch).unwrap();
     let write_duration = start.elapsed();
 
-    // Measure flush
-    let start = Instant::now();
-    db.flush().unwrap();
-    let flush_duration = start.elapsed();
-
     // Measure read
     let start = Instant::now();
     for (key, _) in &data {
@@ -31,8 +26,13 @@ pub fn benchmark_sled() {
     }
     let read_duration = start.elapsed();
 
+    // Measure flush
+    let start = Instant::now();
+    db.flush().unwrap();
+    let flush_duration = start.elapsed();
+
     println!(
-        "Sled: {DATA_SIZE} batch write took {:?}, flush took {:?}, read took {:?}",
-        write_duration, flush_duration, read_duration
+        "Sled: {DATA_SIZE} batch write took {:?}, read took {:?}, flush took {:?}",
+        write_duration, read_duration, flush_duration
     );
 }
