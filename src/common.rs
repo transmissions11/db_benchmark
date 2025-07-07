@@ -1,6 +1,6 @@
 use rand::Rng;
 
-pub const DATA_SIZE: usize = 10_000;
+pub const DATA_SIZE: usize = 50_000;
 
 // Generate a large initial dataset (10x the normal size)
 pub fn generate_large_initial_data() -> Vec<(u64, u64)> {
