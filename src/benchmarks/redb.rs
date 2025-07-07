@@ -1,4 +1,4 @@
-use crate::common::{DATA_SIZE, generate_test_data};
+use crate::common::{DATA_SIZE, generate_large_initial_data, generate_mixed_update_data};
 use std::time::Instant;
 use tempfile::tempdir;
 
@@ -8,32 +8,56 @@ pub fn benchmark_redb() {
     let temp_dir = tempdir().expect("Failed to create tempdir");
     let db_path = temp_dir.path().join("redb_bench.db");
     let db = redb::Database::create(&db_path).unwrap();
-    let data = generate_test_data();
 
-    // Measure write
+    // Generate large initial dataset
+    let initial_data = generate_large_initial_data();
+
+    // Measure initial population
     let start = Instant::now();
     let mut write_txn = db.begin_write().unwrap();
     write_txn.set_durability(redb::Durability::Eventual);
     {
         let mut table = write_txn.open_table(TABLE).unwrap();
-        for (key, value) in &data {
+        for (key, value) in &initial_data {
             table.insert(*key, *value).unwrap();
         }
     }
     write_txn.commit().unwrap();
-    let write_duration = start.elapsed();
+    let initial_write_duration = start.elapsed();
 
-    // Measure read
+    println!(
+        "Redb: Initial population of {} entries took {:?}",
+        initial_data.len(),
+        initial_write_duration
+    );
+
+    // Generate mixed update/insert data
+    let mixed_data = generate_mixed_update_data(&initial_data);
+
+    // Measure mixed writes (updates + inserts)
+    let start = Instant::now();
+    let mut write_txn = db.begin_write().unwrap();
+    write_txn.set_durability(redb::Durability::Eventual);
+    {
+        let mut table = write_txn.open_table(TABLE).unwrap();
+        for (key, value) in &mixed_data {
+            table.insert(*key, *value).unwrap();
+        }
+    }
+    write_txn.commit().unwrap();
+    let mixed_write_duration = start.elapsed();
+
+    // Measure read after mixed writes
     let start = Instant::now();
     let read_txn = db.begin_read().unwrap();
     let table = read_txn.open_table(TABLE).unwrap();
-    for (key, _) in &data {
+    for (key, _) in &mixed_data {
         let _ = table.get(*key).unwrap();
     }
     let read_duration = start.elapsed();
 
     println!(
-        "Redb: {DATA_SIZE} batch write took {:?}, read took {:?}",
-        write_duration, read_duration
+        "Redb: Mixed writes ({} ops, ~50% updates/50% inserts) took {:?}, read took {:?}",
+        DATA_SIZE, mixed_write_duration, read_duration
     );
 }
