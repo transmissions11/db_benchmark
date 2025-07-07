@@ -1,0 +1,9 @@
+[package]
+name = "db_benchmark"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+sled = "0.34"
+redb = "2.0"
+rand = "0.8"
