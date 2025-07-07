@@ -92,8 +92,8 @@ fn benchmark_libmdbx() {
         libmdbx::DatabaseOptions {
             mode: libmdbx::Mode::ReadWrite(libmdbx::ReadWriteOptions {
                 sync_mode: libmdbx::SyncMode::UtterlyNoSync,
-                min_size: Some(1 * 1024 * 1024 * 1024), // 1GB
-                max_size: Some(1000 * 1024 * 1024 * 1024), // 1TB
+                min_size: Some(1024 * 1024 * 1024),       // 1GB
+                max_size: Some(100 * 1024 * 1024 * 1024), // 100GB
                 ..Default::default()
             }),
             ..Default::default()
