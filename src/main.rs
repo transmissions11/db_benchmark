@@ -72,7 +72,7 @@ fn benchmark_hashmap() {
 
     // Measure start
     let start = Instant::now();
-    let mut map = HashMap::with_capacity(100_000);
+    let mut map = HashMap::new();
     for (key, value) in data {
         map.insert(key, value);
     }
